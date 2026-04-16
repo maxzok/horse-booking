@@ -1,0 +1,25 @@
+{% extends "booking/base.html" %}
+
+{% block title %}{{ client }}{% endblock %}
+
+{% block content %}
+<h1>{{ client.first_name }} {{ client.last_name }}</h1>
+<p>Телефон: {{ client.phone }}</p>
+<p>Уровень: {{ client.riding_level }}</p>
+<p>Активный абонемент: 
+    {% if active_subscription %}
+        {{ active_subscription.subscription.name }} (осталось {{ active_subscription.remaining_visits }})
+    {% else %}
+        нет
+    {% endif %}
+</p>
+
+<h3>Последние записи</h3>
+<ul>
+{% for b in bookings %}
+    <li>{{ b.start_time }} - {{ b.service_type.name }}</li>
+{% empty %}
+    <li>Нет записей</li>
+{% endfor %}
+</ul>
+{% endblock %}

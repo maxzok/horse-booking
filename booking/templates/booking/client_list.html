@@ -1,0 +1,60 @@
+{% extends "booking/base.html" %}
+
+{% block title %}Список клиентов{% endblock %}
+
+{% block content %}
+<h1>👥 Клиенты</h1>
+
+<!-- Форма поиска -->
+<form method="get" class="row g-3 mb-4">
+    <div class="col-auto">
+        <input type="text" name="q" class="form-control" placeholder="Имя, фамилия или телефон" value="{{ query }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">🔍 Найти</button>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'booking:client_list' %}" class="btn btn-secondary">Сбросить</a>
+    </div>
+</form>
+
+<!-- Таблица клиентов -->
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>Фамилия</th>
+            <th>Имя</th>
+            <th>Телефон</th>
+            <th>Уровень</th>
+            <th>Абонемент</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for client in clients %}
+        <tr>
+            <td>{{ client.last_name }}</td>
+            <td>{{ client.first_name }}</td>
+            <td>{{ client.phone }}</td>
+            <td>{{ client.riding_level }}</td>
+            <td>
+                {% with sub=client.active_subscription %}
+                    {% if sub %}
+                        {{ sub.subscription.name }} ({{ sub.remaining_visits }})
+                    {% else %}
+                        —
+                    {% endif %}
+                {% endwith %}
+            </td>
+            <td>
+                <a href="{% url 'booking:client_detail' client.id %}" class="btn btn-sm btn-outline-primary">Подробнее</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center">Клиенты не найдены</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
