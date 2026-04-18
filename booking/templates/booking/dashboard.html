@@ -52,6 +52,20 @@
     </div>
 </div>
 
+<h3>👨‍🏫 Тренеры</h3>
+<ul>
+{% for trainer in trainers %}
+    <li><a href="{% url 'booking:trainer_stats' trainer.id %}">{{ trainer }}</a></li>
+{% endfor %}
+</ul>
+
+<h3>🐎 Лошади</h3>
+<ul>
+{% for horse in horses %}
+    <li><a href="{% url 'booking:horse_stats' horse.id %}">{{ horse.name }}</a></li>
+{% endfor %}
+</ul>
+
 <!-- Статистика -->
 <div class="row mb-4">
     <div class="col-md-4">

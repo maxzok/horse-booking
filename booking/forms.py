@@ -6,7 +6,15 @@ from .models import Booking, Client, ClientSubscription
 class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
-        fields = ["client", "trainer", "horse", "service_type", "start_time", "notes"]
+        fields = [
+            "client",
+            "trainer",
+            "horse",
+            "service_type",
+            "start_time",
+            "notes",
+            "payment_method",
+        ]
         widgets = {
             "start_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
         }

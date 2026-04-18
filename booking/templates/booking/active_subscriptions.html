@@ -1,0 +1,62 @@
+{% extends "booking/base.html" %}
+
+{% block title %}Активные абонементы{% endblock %}
+
+{% block content %}
+<h1>📋 Активные абонементы</h1>
+
+<!-- Поиск по клиенту -->
+<form method="get" class="row g-3 mb-4">
+    <div class="col-auto">
+        <input type="text" name="q" class="form-control" placeholder="Имя, фамилия или телефон" value="{{ query }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">🔍 Найти</button>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'booking:active_subscriptions' %}" class="btn btn-secondary">Сбросить</a>
+    </div>
+</form>
+
+<p>Всего активных абонементов: <strong>{{ total_active }}</strong></p>
+
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>Клиент</th>
+            <th>Абонемент</th>
+            <th>Осталось занятий</th>
+            <th>Действует до</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for sub in subscriptions %}
+        <tr>
+            <td>
+                <a href="{% url 'booking:client_detail' sub.client.id %}">
+                    {{ sub.client.last_name }} {{ sub.client.first_name }}
+                </a><br>
+                <small class="text-muted">{{ sub.client.phone }}</small>
+            </td>
+            <td>{{ sub.subscription.name }}</td>
+            <td>
+                <span class="badge bg-{% if sub.remaining_visits <= 2 %}warning{% else %}success{% endif %}">
+                    {{ sub.remaining_visits }} / {{ sub.visits_total }}
+                </span>
+            </td>
+            <td>{{ sub.end_date|date:"d.m.Y" }}</td>
+            <td>
+                <a href="{% url 'booking:subscription_detail' sub.id %}" class="btn btn-sm btn-outline-primary">
+                    Подробнее
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center">Активных абонементов не найдено</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

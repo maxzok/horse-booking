@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-from datetime import timedelta
+from datetime import date, timedelta
+from django.db.models import Sum
 
 
 class Client(models.Model):
@@ -61,6 +62,12 @@ class Trainer(models.Model):
         default=4, verbose_name="Макс. лошадей в день"
     )
     is_active = models.BooleanField(default=True)
+    commission_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=50.00,
+        verbose_name="Процент от стоимости услуг (%)",
+    )
 
     class Meta:
         verbose_name = "Тренер"
@@ -74,6 +81,35 @@ class Trainer(models.Model):
         return self.booking_set.filter(
             start_time__date=date, status__in=["confirmed", "completed"]
         ).count()
+
+    def get_monthly_stats(self, year, month):
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+
+        bookings = self.booking_set.filter(
+            start_time__date__gte=start_date,
+            start_time__date__lt=end_date,
+            status__in=["completed", "confirmed"],
+        )
+
+        total_bookings = bookings.count()
+        total_revenue = sum(
+            b.price_charged if b.price_charged else b.service_type.default_price
+            for b in bookings
+        )
+        trainer_earned = total_revenue * (self.commission_rate / 100)
+
+        return {
+            "total_bookings": total_bookings,
+            "total_revenue": total_revenue,
+            "commission_rate": float(self.commission_rate),
+            "earned": trainer_earned,
+            "month": month,
+            "year": year,
+        }
 
 
 class Horse(models.Model):
@@ -107,6 +143,29 @@ class Horse(models.Model):
         return self.booking_set.filter(
             start_time__date=date, status__in=["confirmed", "completed"]
         ).count()
+
+    def get_monthly_stats(self, year, month):
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+
+        bookings = self.booking_set.filter(
+            start_time__date__gte=start_date,
+            start_time__date__lt=end_date,
+            status__in=["completed", "confirmed"],
+        )
+        total_bookings = bookings.count()
+        total_minutes = sum(b.service_type.duration for b in bookings)
+        total_hours = total_minutes / 60.0
+
+        return {
+            "total_bookings": total_bookings,
+            "total_hours": total_hours,
+            "month": month,
+            "year": year,
+        }
 
     def is_available(self, start_time, end_time, exclude_booking_id=None):
         # Проверяем пересекающиеся бронирования
@@ -172,6 +231,13 @@ class Booking(models.Model):
         ("no_show", "Неявка"),
     ]
 
+    PAYMENT_METHODS = [
+        ("card", "Карта"),
+        ("cash", "Наличные"),
+        ("certificate", "Подарочный сертификат"),
+        ("subscription", "Абонемент"),
+    ]
+
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Клиент")
     trainer = models.ForeignKey(
         Trainer, on_delete=models.CASCADE, verbose_name="Тренер"
@@ -186,6 +252,12 @@ class Booking(models.Model):
     notes = models.TextField(blank=True, verbose_name="Заметки")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHODS,
+        default="card",
+        verbose_name="Способ оплаты",
+    )
 
     # Связь с абонементом (если занятие списывается с абонемента)
     used_subscription = models.ForeignKey(
@@ -297,9 +369,10 @@ class ClientSubscription(models.Model):
         super().save(*args, **kwargs)
 
     def use_visit(self):
-        """Списать одно посещение"""
         if self.remaining_visits > 0:
             self.remaining_visits -= 1
-            self.save()
+            self.save(
+                update_fields=["remaining_visits"]
+            )  # <-- лучше указать update_fields
             return True
         return False

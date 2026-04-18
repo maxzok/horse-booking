@@ -1,0 +1,61 @@
+{% extends "booking/base.html" %}
+
+{% block title %}Абонемент {{ subscription.subscription.name }}{% endblock %}
+
+{% block content %}
+<h1>🎫 Абонемент: {{ subscription.subscription.name }}</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Клиент: {{ subscription.client.last_name }} {{ subscription.client.first_name }}</h5>
+        <p class="card-text">
+            <strong>Телефон:</strong> {{ subscription.client.phone }}<br>
+            <strong>Тип абонемента:</strong> {{ subscription.subscription.name }} ({{ subscription.subscription.visits }} занятий)<br>
+            <strong>Дата покупки:</strong> {{ subscription.purchase_date|date:"d.m.Y H:i" }}<br>
+            <strong>Срок действия:</strong> с {{ subscription.start_date|date:"d.m.Y" }} по {{ subscription.end_date|date:"d.m.Y" }}<br>
+            <strong>Осталось занятий:</strong> 
+            <span class="badge bg-{% if subscription.remaining_visits == 0 %}secondary{% elif subscription.remaining_visits <= 2 %}warning{% else %}success{% endif %}">
+                {{ subscription.remaining_visits }} / {{ subscription.visits_total }}
+            </span><br>
+            <strong>Статус оплаты:</strong> 
+            {% if subscription.is_paid %}
+                <span class="badge bg-success">Оплачен</span>
+            {% else %}
+                <span class="badge bg-danger">Не оплачен</span>
+            {% endif %}
+        </p>
+        <a href="{% url 'booking:client_detail' subscription.client.id %}" class="btn btn-secondary">← К карточке клиента</a>
+        <a href="{% url 'booking:active_subscriptions' %}" class="btn btn-outline-primary">К списку активных</a>
+    </div>
+</div>
+
+<h3>📌 История списаний ({{ total_spent }} занятий)</h3>
+
+{% if used_bookings %}
+<table class="table table-sm table-striped">
+    <thead>
+        <tr>
+            <th>Дата и время</th>
+            <th>Услуга</th>
+            <th>Лошадь</th>
+            <th>Тренер</th>
+            <th>Статус</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for booking in used_bookings %}
+        <tr>
+            <td>{{ booking.start_time|date:"d.m.Y H:i" }}</td>
+            <td>{{ booking.service_type.name }}</td>
+            <td>{{ booking.horse.name }}</td>
+            <td>{{ booking.trainer.first_name }} {{ booking.trainer.last_name }}</td>
+            <td><span class="badge bg-success">Завершено</span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">По этому абонементу ещё не было списаний.</p>
+{% endif %}
+
+{% endblock %}

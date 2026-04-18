@@ -1,0 +1,48 @@
+{% extends "booking/base.html" %}
+
+{% block title %}Статистика лошади {{ horse.name }}{% endblock %}
+
+{% block content %}
+<h1>🐴 Статистика лошади: {{ horse.name }}</h1>
+
+<form method="get" class="row g-3 mb-4">
+    <div class="col-auto">
+        <select name="year" class="form-select">
+            {% for y in years %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <select name="month" class="form-select">
+            {% for m_num, m_name in months %}
+                <option value="{{ m_num }}" {% if m_num == selected_month %}selected{% endif %}>{{ m_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Показать</button>
+    </div>
+</form>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Количество занятий</div>
+            <div class="card-body">
+                <h5 class="card-title display-4">{{ stats.total_bookings }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-header">Общее время (часов)</div>
+            <div class="card-body">
+                <h5 class="card-title display-4">{{ stats.total_hours|floatformat:1 }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<a href="{% url 'booking:dashboard' %}" class="btn btn-secondary">← На главную</a>
+{% endblock %}

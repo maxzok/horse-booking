@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
+from django.db.models import Q, Count, Sum
 from datetime import datetime, timedelta
 from .models import *
 from .forms import BookingForm
@@ -23,6 +24,8 @@ def dashboard(request):
         "todays_bookings": todays_bookings,
         "pending_count": Booking.objects.filter(status="pending").count(),
         "active_clients": Client.objects.filter(is_active=True).count(),
+        "trainers": Trainer.objects.filter(is_active=True),  # <-- добавлено
+        "horses": Horse.objects.filter(is_active=True),  # <-- добавлено
     }
     return render(request, "booking/dashboard.html", context)
 
@@ -127,17 +130,77 @@ def client_detail(request, pk):
 
 @login_required
 def complete_booking(request, pk):
-    """Отметить занятие как завершённое и списать посещение с абонемента"""
     booking = get_object_or_404(Booking, pk=pk)
     if booking.status != "completed":
         booking.status = "completed"
-        if booking.used_subscription:
+
+        # Если способ оплаты - абонемент, списываем занятие
+        if booking.payment_method == "subscription" and booking.used_subscription:
             success = booking.used_subscription.use_visit()
             if not success:
                 messages.error(request, "Ошибка списания с абонемента.")
+        elif booking.payment_method == "subscription" and not booking.used_subscription:
+            # Попробуем автоматически подвязать активный абонемент клиента
+            active_sub = booking.client.active_subscription()
+            if active_sub and active_sub.remaining_visits > 0:
+                booking.used_subscription = active_sub
+                success = active_sub.use_visit()
+                if not success:
+                    messages.error(request, "Ошибка списания с абонемента.")
+            else:
+                messages.warning(
+                    request, "У клиента нет активного абонемента, занятие не списано."
+                )
+
         booking.save()
         messages.success(request, "Занятие завершено.")
     return redirect("booking:calendar")
+
+
+@login_required
+def trainer_stats(request, pk):
+    trainer = get_object_or_404(Trainer, pk=pk)
+    today = timezone.now().date()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    stats = trainer.get_monthly_stats(year, month)
+
+    # Для выбора месяца/года в шаблоне
+    months = [(i, datetime(year, i, 1).strftime("%B")) for i in range(1, 13)]
+    years = range(today.year - 2, today.year + 1)
+
+    context = {
+        "trainer": trainer,
+        "stats": stats,
+        "months": months,
+        "years": years,
+        "selected_year": year,
+        "selected_month": month,
+    }
+    return render(request, "booking/trainer_stats.html", context)
+
+
+@login_required
+def horse_stats(request, pk):
+    horse = get_object_or_404(Horse, pk=pk)
+    today = timezone.now().date()
+    year = int(request.GET.get("year", today.year))
+    month = int(request.GET.get("month", today.month))
+
+    stats = horse.get_monthly_stats(year, month)
+    months = [(i, datetime(year, i, 1).strftime("%B")) for i in range(1, 13)]
+    years = range(today.year - 2, today.year + 1)
+
+    context = {
+        "horse": horse,
+        "stats": stats,
+        "months": months,
+        "years": years,
+        "selected_year": year,
+        "selected_month": month,
+    }
+    return render(request, "booking/horse_stats.html", context)
 
 
 @login_required
@@ -158,3 +221,56 @@ def client_list(request):
         "query": query,
     }
     return render(request, "booking/client_list.html", context)
+
+
+@login_required
+def active_subscriptions(request):
+    """Список активных абонементов с фильтрацией по клиенту"""
+    query = request.GET.get("q", "")
+    subscriptions = (
+        ClientSubscription.objects.filter(
+            remaining_visits__gt=0, end_date__gte=timezone.now().date()
+        )
+        .select_related("client", "subscription")
+        .order_by("client__last_name", "client__first_name")
+    )
+
+    if query:
+        subscriptions = subscriptions.filter(
+            Q(client__first_name__icontains=query)
+            | Q(client__last_name__icontains=query)
+            | Q(client__phone__icontains=query)
+        )
+
+    context = {
+        "subscriptions": subscriptions,
+        "query": query,
+        "total_active": subscriptions.count(),
+    }
+    return render(request, "booking/active_subscriptions.html", context)
+
+
+@login_required
+def subscription_detail(request, pk):
+    """Детали абонемента со списком списаний"""
+    subscription = get_object_or_404(
+        ClientSubscription.objects.select_related(
+            "client", "subscription__service_type"
+        ),
+        pk=pk,
+    )
+
+    # Находим все завершённые занятия, где использовался этот абонемент
+    used_bookings = (
+        subscription.booking_set.filter(status="completed")
+        .select_related("service_type", "horse", "trainer")
+        .order_by("-start_time")
+    )
+
+    context = {
+        "subscription": subscription,
+        "used_bookings": used_bookings,
+        "total_spent": used_bookings.count(),
+        "remaining": subscription.remaining_visits,
+    }
+    return render(request, "booking/subscription_detail.html", context)
